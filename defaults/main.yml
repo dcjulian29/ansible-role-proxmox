@@ -84,3 +84,50 @@ proxmox_notification_matchers: []
 # targets first and have them recreated from the current variables.
 proxmox_notification_replace: false
 proxmox_remove_subscription_nag: false
+# The type may be dir, nfs, cifs, lvm, lvmthin, zfspool or pbs, each carrying
+# its own options. The NFS entries below between them cover every content type
+# Proxmox recognizes.
+proxmox_storage: []
+#   - name: nas-guests
+#     type: nfs
+#     options:
+#       server: nas.example.com
+#       export: /volume1/guests
+#       content: images,rootdir
+#       options: vers=4.2
+#   - name: nas-backup
+#     type: nfs
+#     options:
+#       server: nas.example.com
+#       export: /volume1/backup
+#       content: backup
+#       prune-backups: keep-daily=7,keep-weekly=4
+#   - name: nas-template
+#     type: nfs
+#     options:
+#       server: nas.example.com
+#       export: /volume1/template
+#       content: iso,vztmpl,snippets,import
+# Local disks are named in nodes so the cluster does not offer the storage on a
+# member that has no such disk. One entry naming every node that carries the
+# disk beats one entry per node, since a guest can then be migrated between them
+# without its disk reference being rewritten. Use lvmthin or dir, not both for
+# the same disk; proxmox_disk_volume_groups and proxmox_disk_filesystems build
+# whichever one this declares.
+#   - name: local
+#     type: lvmthin
+#     options:
+#       vgname: pve-storage
+#       thinpool: data
+#       content: images,iso,template,rootdir
+#       nodes: host1,host2
+#   - name: local
+#     type: dir
+#     options:
+#       path: /mnt/pve/local-ssd
+#       content: images,rootdir,vztmpl
+#       is_mountpoint: 1    # refuse to write to / when the disk is unmounted
+#       nodes: host1,host2
+#   - name: local-lvm
+#     state: absent
+proxmox_storage_configure: false

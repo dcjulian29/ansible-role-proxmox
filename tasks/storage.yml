@@ -1,0 +1,51 @@
+---
+- name: Read the configured storage
+  ansible.builtin.command:
+    cmd: pvesh get /storage --output-format json
+  register: proxmox_storage_raw
+  changed_when: false
+
+- name: Index the configured storage by name
+  ansible.builtin.set_fact:
+    proxmox_storage_current: >-
+      {{ dict((proxmox_storage_raw.stdout | from_json) | map(attribute='storage')
+         | zip(proxmox_storage_raw.stdout | from_json)) }}
+
+- name: Add the missing storage
+  ansible.builtin.command:
+    cmd: >-
+      pvesm add {{ item.type }} {{ item.name }}
+      {% for key, value in (item.options | default({})).items() %}--{{ key }} {{ value | quote }} {% endfor %}
+  loop: "{{ proxmox_storage }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name not in proxmox_storage_current
+  changed_when: true
+
+- name: Update the storage whose definition has changed
+  ansible.builtin.command:
+    cmd: >-
+      pvesm set {{ item.name }}
+      {% for key, value in (item.options | default({})).items() %}--{{ key }} {{ value | quote }} {% endfor %}
+  loop: "{{ proxmox_storage }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name in proxmox_storage_current
+    - proxmox_storage_current[item.name] | combine(item.options | default({}))
+      != proxmox_storage_current[item.name]
+  changed_when: true
+
+- name: Remove the storage that should be absent
+  ansible.builtin.command:
+    cmd: pvesm remove {{ item.name }}
+  loop: "{{ proxmox_storage }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'absent'
+    - item.name in proxmox_storage_current
+  changed_when: true

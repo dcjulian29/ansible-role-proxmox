@@ -22,6 +22,13 @@
 - name: Ensure the local disks are prepared
   ansible.builtin.include_tasks: disk.yml
   when: proxmox_disk_configure
+
+- name: Ensure the storage is configured
+  ansible.builtin.include_tasks: storage.yml
+  when:
+    - proxmox_storage_configure
+    - proxmox_cluster_manager | bool
+
 - name: Ensure the CPU scaling governor is set
   ansible.builtin.include_tasks: governor.yml
   when: proxmox_cpu_governor_configure
