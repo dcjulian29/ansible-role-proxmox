@@ -11,3 +11,4 @@
     name: "{{ proxmox_microcode_package }}"
     state: present
   when: proxmox_microcode_package | length > 0
+  notify: Restart host
