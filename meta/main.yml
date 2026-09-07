@@ -13,7 +13,5 @@ galaxy_info:
     - name: Debian
       versions:
         - bookworm
-    - name: EL
-      versions:
-        - 10
+        - trixie
   role_name: proxmox

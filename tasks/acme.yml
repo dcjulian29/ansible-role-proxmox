@@ -1,0 +1,45 @@
+---
+- name: Ensure the ACME server and account address are set
+  ansible.builtin.assert:
+    that:
+      - proxmox_acme_email | length > 0
+      - proxmox_acme_url | length > 0
+    fail_msg: proxmox_acme_email and proxmox_acme_url must be set when proxmox_acme_configure is true
+
+- name: Determine which ACME accounts are registered
+  ansible.builtin.command:
+    cmd: pvenode acme account list
+  register: proxmox_acme_accounts
+  changed_when: false
+  failed_when: false
+
+- name: Register the ACME account
+  ansible.builtin.command:
+    cmd: >-
+      pvenode acme account register {{ proxmox_acme_account }} {{ proxmox_acme_email }}
+      --directory {{ proxmox_acme_url }}
+  when: proxmox_acme_account not in proxmox_acme_accounts.stdout
+  changed_when: true
+
+- name: Read the current node configuration
+  ansible.builtin.command:
+    cmd: pvesh get /nodes/{{ ansible_facts['hostname'] }}/config --output-format json
+  register: proxmox_node_config
+  changed_when: false
+
+- name: Configure the ACME domains for this node
+  ansible.builtin.command:
+    cmd: pvenode config set --acme domains={{ proxmox_acme_domains }}
+  when: proxmox_acme_domains not in (proxmox_node_config.stdout | from_json).acme | default('')
+  changed_when: true
+
+- name: Determine whether a certificate has already been issued
+  ansible.builtin.stat:
+    path: /etc/pve/local/pveproxy-ssl.pem
+  register: proxmox_acme_certificate
+
+- name: Order the ACME certificate
+  ansible.builtin.command:
+    cmd: pvenode acme cert order
+  when: not proxmox_acme_certificate.stat.exists
+  changed_when: true

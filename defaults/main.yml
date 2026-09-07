@@ -1,3 +1,7 @@
-#SPDX-License-Identifier: MIT-0
 ---
+proxmox_acme_account: default
+proxmox_acme_configure: false
+proxmox_acme_domains: "{{ ansible_facts['fqdn'] }}"
+proxmox_acme_email: ""
+proxmox_acme_url: ""
 # defaults file for dcjulian29.proxmox

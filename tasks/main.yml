@@ -1,3 +1,5 @@
-#SPDX-License-Identifier: MIT-0
 ---
 # tasks file for dcjulian29.proxmox
+- name: Ensure ACME certificate management is configured
+  ansible.builtin.include_tasks: acme.yml
+  when: proxmox_acme_configure
