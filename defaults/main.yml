@@ -18,4 +18,5 @@ proxmox_cluster_primary: ""
 proxmox_cluster_primary_address: >-
   {{ hostvars[proxmox_cluster_primary]['ansible_facts']['default_ipv4']['address'] | default('') }}
 # defaults file for dcjulian29.proxmox
+proxmox_microcode_install: true
 proxmox_remove_subscription_nag: false

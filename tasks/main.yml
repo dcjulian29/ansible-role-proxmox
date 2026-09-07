@@ -7,6 +7,10 @@
   ansible.builtin.include_tasks: cluster.yml
   when: proxmox_cluster_configure
 
+- name: Ensure the processor microcode is current
+  ansible.builtin.include_tasks: microcode.yml
+  when: proxmox_microcode_install
+
 - name: Ensure ACME certificate management is configured
   ansible.builtin.include_tasks: acme.yml
   when: proxmox_acme_configure

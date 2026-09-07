@@ -1,0 +1,13 @@
+---
+- name: Determine which microcode package this processor needs
+  ansible.builtin.set_fact:
+    proxmox_microcode_package: >-
+      {{ 'intel-microcode' if 'GenuineIntel' in ansible_facts['processor']
+         else 'amd64-microcode' if 'AuthenticAMD' in ansible_facts['processor']
+         else '' }}
+
+- name: Install the processor microcode
+  ansible.builtin.apt:
+    name: "{{ proxmox_microcode_package }}"
+    state: present
+  when: proxmox_microcode_package | length > 0
