@@ -1,0 +1,17 @@
+---
+- name: Remove the subscription notice from the web interface
+  ansible.builtin.replace:
+    path: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    regexp: "res\\.data\\.status\\.toLowerCase\\(\\) !== 'active'"
+    replace: "res.data.status.toLowerCase() === 'NoMoreNagging'"
+  notify: Restart pveproxy
+
+- name: Ensure the subscription notice is removed again after any upgrade
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/no-nag-script
+    owner: root
+    group: root
+    mode: "0644"
+    validate: apt-config dump -c %s
+    content: |
+      DPkg::Post-Invoke { "if [ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ] && ! dpkg -V proxmox-widget-toolkit 2>/dev/null | grep -q proxmoxlib.js; then sed -i '/data.status/{s/!==/===/;s/active/NoMoreNagging/}' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js; fi"; };

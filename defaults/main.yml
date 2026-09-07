@@ -5,3 +5,4 @@ proxmox_acme_domains: "{{ ansible_facts['fqdn'] }}"
 proxmox_acme_email: ""
 proxmox_acme_url: ""
 # defaults file for dcjulian29.proxmox
+proxmox_remove_subscription_nag: false

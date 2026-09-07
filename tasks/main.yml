@@ -1,4 +1,8 @@
 ---
+- name: Ensure the subscription notice is removed
+  ansible.builtin.include_tasks: nag.yml
+  when: proxmox_remove_subscription_nag
+
 # tasks file for dcjulian29.proxmox
 - name: Ensure ACME certificate management is configured
   ansible.builtin.include_tasks: acme.yml
