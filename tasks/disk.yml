@@ -1,0 +1,36 @@
+---
+- name: Ensure the volume groups exist
+  community.general.lvg:
+    vg: "{{ item.name }}"
+    pvs: "{{ item.devices }}"
+  loop: "{{ proxmox_disk_volume_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure the thin pools exist
+  community.general.lvol:
+    vg: "{{ item.0.name }}"
+    thinpool: "{{ item.1.name }}"
+    size: "{{ item.1.size | default('100%FREE') }}"
+  loop: "{{ proxmox_disk_volume_groups | subelements('thinpools', skip_missing=true) }}"
+  loop_control:
+    label: "{{ item.0.name }}/{{ item.1.name }}"
+
+- name: Ensure the filesystems exist
+  community.general.filesystem:
+    dev: "{{ item.device }}"
+    fstype: "{{ item.fstype }}"
+  loop: "{{ proxmox_disk_filesystems }}"
+  loop_control:
+    label: "{{ item.device }}"
+
+- name: Ensure the filesystems are mounted
+  ansible.posix.mount:
+    src: "{{ item.src | default(item.device) }}"
+    path: "{{ item.path }}"
+    fstype: "{{ item.fstype }}"
+    opts: "{{ item.opts | default('defaults') }}"
+    state: mounted
+  loop: "{{ proxmox_disk_filesystems }}"
+  loop_control:
+    label: "{{ item.path }}"

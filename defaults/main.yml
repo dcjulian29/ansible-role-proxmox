@@ -34,6 +34,23 @@ proxmox_datacenter_options: {}
 #   mac_prefix: BC:24:11
 #   max_workers: 4
 proxmox_disk_configure: false
+# Filesystems built and mounted to back dir storage. The device may be a whole
+# disk or an existing partition; no partition table is written either way. Set
+# src to a UUID= form if the kernel is likely to reorder the disk names.
+proxmox_disk_filesystems: []
+#   - device: /dev/sdb
+#     fstype: ext4
+#     path: /mnt/pve/local-storage
+#     opts: defaults,noatime
+# Volume groups and thin pools built to back lvmthin storage. The listed devices
+# are claimed whole.
+proxmox_disk_volume_groups: []
+#   - name: pve-storage
+#     devices:
+#       - /dev/sdb
+#     thinpools:
+#       - name: data
+#         size: 100%FREE
 proxmox_microcode_install: true
 proxmox_notification_configure: false
 proxmox_notification_endpoints: []
