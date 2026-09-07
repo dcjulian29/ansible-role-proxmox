@@ -7,6 +7,10 @@
   ansible.builtin.include_tasks: cluster.yml
   when: proxmox_cluster_configure
 
+- name: Ensure the cluster has a QDevice arbiter
+  ansible.builtin.include_tasks: qdevice.yml
+  when: proxmox_qdevice_configure
+
 - name: Ensure the datacenter options are configured
   ansible.builtin.include_tasks: datacenter.yml
   when:

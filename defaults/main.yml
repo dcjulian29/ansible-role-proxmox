@@ -83,6 +83,10 @@ proxmox_notification_matchers: []
 # secret. Run with -e proxmox_notification_replace=true to delete the declared
 # targets first and have them recreated from the current variables.
 proxmox_notification_replace: false
+proxmox_qdevice_address: >-
+  {{ hostvars[proxmox_qdevice_host]['ansible_facts']['default_ipv4']['address'] | default('') }}
+proxmox_qdevice_configure: false
+proxmox_qdevice_host: ""
 proxmox_remove_subscription_nag: false
 # The type may be dir, nfs, cifs, lvm, lvmthin, zfspool or pbs, each carrying
 # its own options. The NFS entries below between them cover every content type

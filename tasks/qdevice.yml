@@ -1,0 +1,100 @@
+---
+- name: Ensure the arbiter is identified
+  ansible.builtin.assert:
+    that:
+      - proxmox_qdevice_host | length > 0
+    fail_msg: proxmox_qdevice_host must name the arbiter in the inventory
+
+- name: Install the corosync QDevice client
+  ansible.builtin.package:
+    name: corosync-qdevice
+    state: present
+  when: inventory_hostname != proxmox_qdevice_host
+
+- name: Set up the arbiter
+  when: inventory_hostname == proxmox_qdevice_host
+  block:
+    - name: Install the corosync QDevice arbiter daemon
+      ansible.builtin.package:
+        name: corosync-qnetd
+        state: present
+
+    - name: Ensure the arbiter daemon is running
+      ansible.builtin.service:
+        name: corosync-qnetd
+        enabled: true
+        state: started
+
+    - name: Ensure the primary node is identified
+      ansible.builtin.assert:
+        that:
+          - proxmox_cluster_primary | length > 0
+          - proxmox_qdevice_address | length > 0
+        fail_msg: >-
+          proxmox_cluster_primary must name the node pvecm is delegated to, and
+          proxmox_qdevice_address must be the address that node uses to reach
+          this host.
+
+    - name: Read the cluster configuration
+      ansible.builtin.slurp:
+        src: /etc/pve/corosync.conf
+      become: false
+      delegate_to: "{{ proxmox_cluster_primary }}"
+      register: proxmox_qdevice_corosync
+
+    - name: Register the arbiter with the cluster
+      when: "'device {' not in (proxmox_qdevice_corosync.content | b64decode)"
+      block:
+        - name: Ensure the cluster has more than one member
+          ansible.builtin.assert:
+            that:
+              - (proxmox_qdevice_corosync.content | b64decode).count('node {') > 1
+            fail_msg: >-
+              The cluster has a single member, so there is nothing for an
+              arbiter to break a tie between. Join the remaining nodes first.
+
+        - name: Ensure the primary node's root has an SSH key pair
+          ansible.builtin.user:
+            name: root
+            generate_ssh_key: true
+            ssh_key_type: ed25519
+            ssh_key_file: .ssh/id_ed25519
+          become: false
+          delegate_to: "{{ proxmox_cluster_primary }}"
+
+        - name: Read the primary node's root public key
+          ansible.builtin.slurp:
+            src: /root/.ssh/id_ed25519.pub
+          become: false
+          delegate_to: "{{ proxmox_cluster_primary }}"
+          register: proxmox_qdevice_primary_key
+
+        - name: Authorize the primary node's root key on this host
+          ansible.posix.authorized_key:
+            user: root
+            key: "{{ proxmox_qdevice_primary_key.content | b64decode }}"
+            state: present
+
+        - name: Determine whether the primary already trusts this host's key
+          ansible.builtin.command:
+            cmd: ssh-keygen -F {{ proxmox_qdevice_address }}
+          become: false
+          delegate_to: "{{ proxmox_cluster_primary }}"
+          register: proxmox_qdevice_known_host
+          changed_when: false
+          failed_when: false
+
+        - name: Trust this host's SSH key on the primary
+          ansible.builtin.shell:
+            cmd: ssh-keyscan -t ed25519 {{ proxmox_qdevice_address }} >> /root/.ssh/known_hosts
+          become: false
+          delegate_to: "{{ proxmox_cluster_primary }}"
+          when: proxmox_qdevice_known_host.rc != 0
+          changed_when: true
+
+        - name: Register the QDevice
+          ansible.builtin.command:
+            cmd: pvecm qdevice setup {{ proxmox_qdevice_address }}
+          become: false
+          delegate_to: "{{ proxmox_cluster_primary }}"
+          changed_when: true
