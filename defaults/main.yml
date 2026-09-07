@@ -35,4 +35,35 @@ proxmox_datacenter_options: {}
 #   max_workers: 4
 proxmox_disk_configure: false
 proxmox_microcode_install: true
+proxmox_notification_configure: false
+proxmox_notification_endpoints: []
+#   - name: gotify
+#     type: gotify
+#     options:
+#       server: https://gotify.example.com
+#       token: "{{ vault_proxmox_gotify_token }}"
+#       comment: clustername
+#   - name: smtp
+#     type: smtp
+#     options:
+#       server: smtp.example.com
+#       mode: starttls    # tls (465), starttls (587) or insecure (25)
+#       port: 587
+#       from-address: proxmox@example.com
+#       mailto:
+#         - admin@example.com
+#       username: proxmox@example.com
+#       password: ChangeME!!
+#       author: Proxmox Notifications
+proxmox_notification_matchers: []
+#   - name: default-matcher
+#     options:
+#       mode: all
+#       target:
+#         - gotify
+#         - smtp
+# Tokens and passwords are write only, so an update can never push a rotated
+# secret. Run with -e proxmox_notification_replace=true to delete the declared
+# targets first and have them recreated from the current variables.
+proxmox_notification_replace: false
 proxmox_remove_subscription_nag: false

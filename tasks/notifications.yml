@@ -1,0 +1,165 @@
+---
+- name: Read the configured notification endpoints
+  ansible.builtin.command:
+    cmd: pvesh get /cluster/notifications/endpoints/{{ item }} --output-format json
+  loop: "{{ proxmox_notification_endpoints | map(attribute='type') | unique | list }}"
+  register: proxmox_notification_raw
+  changed_when: false
+
+- name: Read the configured notification matchers
+  ansible.builtin.command:
+    cmd: pvesh get /cluster/notifications/matchers --output-format json
+  register: proxmox_notification_matcher_raw
+  changed_when: false
+
+- name: Index the notification endpoints and matchers by name
+  ansible.builtin.set_fact:
+    proxmox_notification_current: "{{ dict(endpoints | map(attribute='name') | zip(endpoints)) }}"
+    proxmox_notification_matcher_current: "{{ dict(matchers | map(attribute='name') | zip(matchers)) }}"
+  vars:
+    endpoints: >-
+      {{ proxmox_notification_raw.results | default([]) | map(attribute='stdout')
+         | map('from_json') | flatten }}
+    matchers: "{{ proxmox_notification_matcher_raw.stdout | from_json }}"
+
+- name: Remove the notification matchers marked for replacement
+  ansible.builtin.command:
+    cmd: pvesh delete /cluster/notifications/matchers/{{ item.name }}
+  loop: "{{ proxmox_notification_matchers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - proxmox_notification_replace | bool
+    - item.state | default('present') == 'present'
+    - item.name in proxmox_notification_matcher_current
+  changed_when: true
+
+- name: Remove the notification endpoints marked for replacement
+  ansible.builtin.command:
+    cmd: pvesh delete /cluster/notifications/endpoints/{{ item.type }}/{{ item.name }}
+  loop: "{{ proxmox_notification_endpoints }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - proxmox_notification_replace | bool
+    - item.state | default('present') == 'present'
+    - item.name in proxmox_notification_current
+  changed_when: true
+
+- name: Forget the notification targets removed for replacement
+  ansible.builtin.set_fact:
+    proxmox_notification_current: >-
+      {{ proxmox_notification_current | dict2items
+         | rejectattr('key', 'in', proxmox_notification_endpoints | map(attribute='name') | list)
+         | items2dict }}
+    proxmox_notification_matcher_current: >-
+      {{ proxmox_notification_matcher_current | dict2items
+         | rejectattr('key', 'in', proxmox_notification_matchers | map(attribute='name') | list)
+         | items2dict }}
+  when: proxmox_notification_replace | bool
+
+- name: Add the missing notification endpoints
+  ansible.builtin.command:
+    cmd: >-
+      pvesh create /cluster/notifications/endpoints/{{ item.type }}
+      --name {{ item.name }} {{ proxmox_notification_args }}
+  vars:
+    proxmox_notification_args: >-
+      {% for key, value in (item.options | default({})).items() -%}
+      {% if value is not string and value is sequence -%}
+      {% for entry in value %}--{{ key }} {{ entry | quote }} {% endfor -%}
+      {% else -%}
+      --{{ key }} {{ value | quote }} {% endif -%}
+      {% endfor %}
+  loop: "{{ proxmox_notification_endpoints }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name not in proxmox_notification_current
+  changed_when: true
+
+- name: Update the notification endpoints whose definition has changed
+  ansible.builtin.command:
+    cmd: >-
+      pvesh set /cluster/notifications/endpoints/{{ item.type }}/{{ item.name }}
+      {{ proxmox_notification_args }}
+  vars:
+    proxmox_notification_args: >-
+      {% for key, value in (item.options | default({})).items() -%}
+      {% if value is not string and value is sequence -%}
+      {% for entry in value %}--{{ key }} {{ entry | quote }} {% endfor -%}
+      {% else -%}
+      --{{ key }} {{ value | quote }} {% endif -%}
+      {% endfor %}
+  loop: "{{ proxmox_notification_endpoints }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name in proxmox_notification_current
+    - proxmox_notification_current[item.name] | combine(item.options | default({}))
+      != proxmox_notification_current[item.name]
+  changed_when: true
+
+- name: Remove the notification endpoints that should be absent
+  ansible.builtin.command:
+    cmd: pvesh delete /cluster/notifications/endpoints/{{ item.type }}/{{ item.name }}
+  loop: "{{ proxmox_notification_endpoints }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'absent'
+    - item.name in proxmox_notification_current
+  changed_when: true
+
+- name: Add the missing notification matchers
+  ansible.builtin.command:
+    cmd: pvesh create /cluster/notifications/matchers --name {{ item.name }} {{ proxmox_notification_args }}
+  vars:
+    proxmox_notification_args: >-
+      {% for key, value in (item.options | default({})).items() -%}
+      {% if value is not string and value is sequence -%}
+      {% for entry in value %}--{{ key }} {{ entry | quote }} {% endfor -%}
+      {% else -%}
+      --{{ key }} {{ value | quote }} {% endif -%}
+      {% endfor %}
+  loop: "{{ proxmox_notification_matchers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name not in proxmox_notification_matcher_current
+  changed_when: true
+
+- name: Update the notification matchers whose definition has changed
+  ansible.builtin.command:
+    cmd: pvesh set /cluster/notifications/matchers/{{ item.name }} {{ proxmox_notification_args }}
+  vars:
+    proxmox_notification_args: >-
+      {% for key, value in (item.options | default({})).items() -%}
+      {% if value is not string and value is sequence -%}
+      {% for entry in value %}--{{ key }} {{ entry | quote }} {% endfor -%}
+      {% else -%}
+      --{{ key }} {{ value | quote }} {% endif -%}
+      {% endfor %}
+  loop: "{{ proxmox_notification_matchers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.name in proxmox_notification_matcher_current
+    - proxmox_notification_matcher_current[item.name] | combine(item.options | default({}))
+      != proxmox_notification_matcher_current[item.name]
+  changed_when: true
+
+- name: Remove the notification matchers that should be absent
+  ansible.builtin.command:
+    cmd: pvesh delete /cluster/notifications/matchers/{{ item.name }}
+  loop: "{{ proxmox_notification_matchers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - item.state | default('present') == 'absent'
+    - item.name in proxmox_notification_matcher_current
+  changed_when: true
