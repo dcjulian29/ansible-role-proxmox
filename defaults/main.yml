@@ -9,6 +9,10 @@ proxmox_cluster_configure: false
 # let Proxmox use the address the node name resolves to, which is correct when
 # management and cluster traffic share one interface.
 proxmox_cluster_links: []
+# True on the node that owns cluster-wide configuration, which is the primary in
+# a cluster and the node itself when it stands alone.
+proxmox_cluster_manager: >-
+  {{ proxmox_cluster_primary | length == 0 or inventory_hostname == proxmox_cluster_primary }}
 proxmox_cluster_name: ""
 # Inventory name of the node that creates the cluster. Every other node joins.
 proxmox_cluster_primary: ""
@@ -21,5 +25,14 @@ proxmox_cluster_primary_address: >-
 # "performance" (pinned to maximum) exist.
 proxmox_cpu_governor: powersave
 proxmox_cpu_governor_configure: false
+proxmox_datacenter_configure: false
+# Keys written to /etc/pve/datacenter.cfg. Give values exactly as the API
+# returns them, since they are compared as strings to decide whether to write.
+proxmox_datacenter_options: {}
+#   keyboard: en-us
+#   language: en
+#   mac_prefix: BC:24:11
+#   max_workers: 4
+proxmox_disk_configure: false
 proxmox_microcode_install: true
 proxmox_remove_subscription_nag: false

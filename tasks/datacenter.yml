@@ -1,0 +1,15 @@
+---
+- name: Read the current datacenter options
+  ansible.builtin.command:
+    cmd: pvesh get /cluster/options --output-format json
+  register: proxmox_datacenter_current
+  changed_when: false
+
+- name: Apply the datacenter options
+  ansible.builtin.command:
+    cmd: pvesh set /cluster/options --{{ item.key }} {{ item.value | quote }}
+  loop: "{{ proxmox_datacenter_options | dict2items }}"
+  when: >-
+    ((proxmox_datacenter_current.stdout | from_json)[item.key] | default('')) | string
+    != item.value | string
+  changed_when: true
