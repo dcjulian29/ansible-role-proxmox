@@ -4,5 +4,18 @@ proxmox_acme_configure: false
 proxmox_acme_domains: "{{ ansible_facts['fqdn'] }}"
 proxmox_acme_email: ""
 proxmox_acme_url: ""
+proxmox_cluster_configure: false
+# Corosync ring addresses for this node, most important first. Leave empty to
+# let Proxmox use the address the node name resolves to, which is correct when
+# management and cluster traffic share one interface.
+proxmox_cluster_links: []
+proxmox_cluster_name: ""
+# Inventory name of the node that creates the cluster. Every other node joins.
+proxmox_cluster_primary: ""
+# Address a joining node uses to reach the primary. Taken from the primary's
+# gathered facts, so it is the machine Ansible actually connected to rather
+# than whatever DNS happens to return.
+proxmox_cluster_primary_address: >-
+  {{ hostvars[proxmox_cluster_primary]['ansible_facts']['default_ipv4']['address'] | default('') }}
 # defaults file for dcjulian29.proxmox
 proxmox_remove_subscription_nag: false

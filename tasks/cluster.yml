@@ -1,0 +1,92 @@
+---
+- name: Ensure the cluster name and primary node are set
+  ansible.builtin.assert:
+    that:
+      - proxmox_cluster_name | length > 0
+      - proxmox_cluster_primary | length > 0
+    fail_msg: proxmox_cluster_name and proxmox_cluster_primary must be set when proxmox_cluster_configure is true
+
+- name: Determine whether this node already belongs to a cluster
+  ansible.builtin.stat:
+    path: /etc/pve/corosync.conf
+  register: proxmox_cluster_corosync
+
+- name: Form the cluster
+  when: not proxmox_cluster_corosync.stat.exists
+  vars:
+    proxmox_cluster_link_args: >-
+      {% for address in proxmox_cluster_links %}--link{{ loop.index0 }} {{ address }} {% endfor %}
+  block:
+    - name: Create the cluster on the primary node
+      ansible.builtin.command:
+        cmd: pvecm create {{ proxmox_cluster_name }} {{ proxmox_cluster_link_args }}
+      when: inventory_hostname == proxmox_cluster_primary
+      changed_when: true
+
+    - name: Join this node to the cluster
+      when: inventory_hostname != proxmox_cluster_primary
+      block:
+        - name: Ensure the primary node address is known
+          ansible.builtin.assert:
+            that:
+              - proxmox_cluster_primary_address | length > 0
+            fail_msg: >-
+              proxmox_cluster_primary_address is empty. Facts for
+              {{ proxmox_cluster_primary }} were not gathered in this run - run the
+              primary's playbook first, or set the address explicitly.
+
+        - name: Determine whether guests are present on this node
+          ansible.builtin.command:
+            cmd: pvesh get /nodes/{{ ansible_facts['hostname'] }}/{{ item }} --output-format json
+          register: proxmox_cluster_guests
+          changed_when: false
+          loop:
+            - qemu
+            - lxc
+
+        - name: Refuse to join while guests are present
+          ansible.builtin.assert:
+            that:
+              - (proxmox_cluster_guests.results | map(attribute='stdout') | map('from_json') | map('length') | sum) == 0
+            fail_msg: >-
+              This node has virtual machines or containers. Joining replaces
+              /etc/pve, so migrate or remove them before joining the cluster.
+
+        - name: Ensure root has an SSH key pair
+          ansible.builtin.user:
+            name: root
+            generate_ssh_key: true
+            ssh_key_type: ed25519
+            ssh_key_file: .ssh/id_ed25519
+
+        - name: Read this node's root public key
+          ansible.builtin.slurp:
+            src: /root/.ssh/id_ed25519.pub
+          register: proxmox_cluster_root_key
+
+        - name: Authorize this node's root key on the primary
+          ansible.posix.authorized_key:
+            user: root
+            key: "{{ proxmox_cluster_root_key.content | b64decode }}"
+            state: present
+          delegate_to: "{{ proxmox_cluster_primary }}"
+
+        - name: Determine whether the primary node's host key is already trusted
+          ansible.builtin.command:
+            cmd: ssh-keygen -F {{ proxmox_cluster_primary_address }}
+          register: proxmox_cluster_known_host
+          changed_when: false
+          failed_when: false
+
+        - name: Trust the primary node's SSH host key
+          ansible.builtin.shell:
+            cmd: ssh-keyscan -t ed25519 {{ proxmox_cluster_primary_address }} >> /root/.ssh/known_hosts
+          when: proxmox_cluster_known_host.rc != 0
+          changed_when: true
+
+        - name: Join the cluster
+          ansible.builtin.command:
+            cmd: >-
+              pvecm add {{ proxmox_cluster_primary_address }} --use_ssh
+              {{ proxmox_cluster_link_args }}
+          changed_when: true

@@ -3,7 +3,10 @@
   ansible.builtin.include_tasks: nag.yml
   when: proxmox_remove_subscription_nag
 
-# tasks file for dcjulian29.proxmox
+- name: Ensure the node belongs to the cluster
+  ansible.builtin.include_tasks: cluster.yml
+  when: proxmox_cluster_configure
+
 - name: Ensure ACME certificate management is configured
   ansible.builtin.include_tasks: acme.yml
   when: proxmox_acme_configure
