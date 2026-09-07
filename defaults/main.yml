@@ -17,6 +17,9 @@ proxmox_cluster_primary: ""
 # than whatever DNS happens to return.
 proxmox_cluster_primary_address: >-
   {{ hostvars[proxmox_cluster_primary]['ansible_facts']['default_ipv4']['address'] | default('') }}
-# defaults file for dcjulian29.proxmox
+# With intel_pstate or amd_pstate only "powersave" (dynamic, the default) and
+# "performance" (pinned to maximum) exist.
+proxmox_cpu_governor: powersave
+proxmox_cpu_governor_configure: false
 proxmox_microcode_install: true
 proxmox_remove_subscription_nag: false

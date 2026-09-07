@@ -7,6 +7,10 @@
   ansible.builtin.include_tasks: cluster.yml
   when: proxmox_cluster_configure
 
+- name: Ensure the CPU scaling governor is set
+  ansible.builtin.include_tasks: governor.yml
+  when: proxmox_cpu_governor_configure
+
 - name: Ensure the processor microcode is current
   ansible.builtin.include_tasks: microcode.yml
   when: proxmox_microcode_install

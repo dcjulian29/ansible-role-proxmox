@@ -1,0 +1,37 @@
+---
+- name: Determine whether this processor exposes frequency scaling
+  ansible.builtin.stat:
+    path: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+  register: proxmox_cpu_scaling
+
+- name: Configure the CPU scaling governor
+  when: proxmox_cpu_scaling.stat.exists
+  block:
+    - name: Read the governors this processor supports
+      ansible.builtin.slurp:
+        src: /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+      register: proxmox_cpu_governors
+
+    - name: Ensure the requested governor is supported
+      ansible.builtin.assert:
+        that:
+          - proxmox_cpu_governor in (proxmox_cpu_governors.content | b64decode).split()
+        fail_msg: >-
+          {{ proxmox_cpu_governor }} is not available on this processor. This
+          node supports: {{ (proxmox_cpu_governors.content | b64decode) | trim }}
+
+    - name: Install the governor unit
+      ansible.builtin.template:
+        src: cpu-governor.service.j2
+        dest: /etc/systemd/system/cpu-governor.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart cpu-governor
+
+    - name: Ensure the governor is applied at boot
+      ansible.builtin.systemd_service:
+        name: cpu-governor.service
+        enabled: true
+        state: started
+        daemon_reload: true
