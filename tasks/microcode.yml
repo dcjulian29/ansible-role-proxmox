@@ -6,9 +6,50 @@
          else 'amd64-microcode' if 'AuthenticAMD' in ansible_facts['processor']
          else '' }}
 
-- name: Install the processor microcode
-  ansible.builtin.apt:
-    name: "{{ proxmox_microcode_package }}"
-    state: present
+- name: Ensure the processor microcode is current
   when: proxmox_microcode_package | length > 0
-  notify: Restart host
+  block:
+    - name: Determine whether the microcode package is available
+      ansible.builtin.command:
+        cmd: apt-cache policy {{ proxmox_microcode_package }}
+      register: proxmox_microcode_policy
+      changed_when: false
+
+    - name: Ensure the non-free-firmware component is available
+      ansible.builtin.deb822_repository:
+        name: "{{ item.name }}"
+        types: [deb]
+        uris: "{{ item.uris }}"
+        suites: "{{ item.suites }}"
+        components:
+          - non-free-firmware
+        signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+      loop:
+        - name: debian-firmware
+          uris:
+            - http://deb.debian.org/debian
+          suites:
+            - "{{ ansible_facts['distribution_release'] }}"
+            - "{{ ansible_facts['distribution_release'] }}-updates"
+        - name: debian-firmware-security
+          uris:
+            - http://security.debian.org/debian-security
+          suites:
+            - "{{ ansible_facts['distribution_release'] }}-security"
+      loop_control:
+        label: "{{ item.name }}"
+      when: >-
+        'Candidate: (none)' in proxmox_microcode_policy.stdout
+        or 'Candidate:' not in proxmox_microcode_policy.stdout
+      register: proxmox_microcode_repository
+
+    - name: Refresh the package lists
+      ansible.builtin.apt:
+        update_cache: true
+      when: proxmox_microcode_repository.changed | default(false)
+
+    - name: Install the processor microcode
+      ansible.builtin.apt:
+        name: "{{ proxmox_microcode_package }}"
+        state: present
+      notify: Reboot Host
